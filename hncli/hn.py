@@ -1,7 +1,6 @@
 '''
 Interacting with Hacker News site.
 '''
-from collections import namedtuple
 from re import compile as regex
 import requests
 from bs4 import BeautifulSoup
@@ -9,10 +8,57 @@ from bs4 import BeautifulSoup
 
 URL = "http://news.ycombinator.com/"
 
-Story = namedtuple('Story',
-				   ['title', 'url', 'author', 'points', 'time', 
-				    'comments_count', 'comments_url',
-				    'upvote_url', 'downvote_url'])
+
+class Story(object):
+	''' Holds information about single HN story. '''
+
+	__slots__ = ['title', 'url', 'author', 'points', 'time', 
+				 'comments_count', 'comments_url',
+				 'upvote_url', 'downvote_url']
+
+	def __init__(self, **kw):
+		for k in self.__slots__:
+			setattr(self, k, kw.get(k, ''))
+
+	@staticmethod
+	def from_html(main_row, subtext_row):
+		''' Constructs Story from HN site markup elements. '''
+		link = main_row.find_all('td')[2].a
+		vote_td = main_row.find_all('td')[1]
+		subtext = subtext_row.find('td', {'class': 'subtext'})
+		comments_link = subtext.find('a', href=regex(r'item\?id\=.+'))
+		not_job = bool(comments_link)
+
+		story = {'title': link.text, 'url': link['href']}
+		if not_job:
+			comments_count = comments_link.text.split()[0]
+			if comments_count.strip() == 'discuss':
+				comments_count = 0
+			story.update({
+				'author': subtext.find('a', href=regex(r'user\?id\=.+')).text,
+				'points': int(subtext.find('span', id=regex(r'score_\d+')
+							).text.split()[0]),
+				'time': list(subtext.strings)[-2].replace('|', '').strip(),
+				'comments_count': comments_count,
+				'comments_url': comments_link['href'],
+				'upvote_url': vote_td.find('a', id=regex(r'up_\d+'))['href'],
+			})
+		else:
+			story['time'] = subtext.text
+
+		return Story(**story)
+
+	@property
+	def job_post(self):
+		''' Is this story a job posting? '''
+		return not bool(self.comments_url)
+
+	@property
+	def subtext(self):
+		if self.job_post:
+			return self.time
+		return "%s points by %s %s | %s comments" % (
+			self.points, self.author, self.time, self.comments_count)
 
 
 def get_recent_stories(count=10):
@@ -24,26 +70,5 @@ def get_recent_stories(count=10):
 	del news_trs[2::3]							# every third row is separator
 	items = zip(*([iter(news_trs)] * 2))		# stories span two rows
 
-	# dive into the soup, extract information...
-	# import ipdb ; ipdb.set_trace()
-	for first_tr, second_tr in items[:count]:
-		link = first_tr.find_all('td')[2].a
-		vote_td = first_tr.find_all('td')[1]
-		subtext = second_tr.find('td', {'class': 'subtext'})
-		comments_link = subtext.find('a', href=regex(r'item\?id\=.+'))
-		not_job = bool(comments_link)
-
-		# ...and live to tell the Story!
-		print list(subtext.strings)
-		yield Story(
-			title=link.text,
-			url=link['href'],
-			author=subtext.find('a', href=regex(r'user\?id\=.+')).text if not_job else '',
-			points=subtext.find('span', id=regex(r'score_\d+')).text.split()[0] if not_job else '',
-			time='' if not_job else subtext.text,
-			comments_count=comments_link.text.split()[0] if not_job else 0,
-			comments_url=comments_link['href'] if not_job else '',
-			upvote_url=(vote_td.find('a', id=regex(r'up_\d+'))['href']
-						if not_job else ''),
-			downvote_url='', # NYI
-		)
+	for item in items[:count]:
+		yield Story.from_html(*item)

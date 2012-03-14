@@ -3,6 +3,7 @@
 hncli -- Main entry point
 '''
 import cmd
+import sys
 from . import hn
 
 
@@ -19,11 +20,11 @@ class HackerNews(cmd.Cmd):
 		for i, story in enumerate(stories, 1):
 			number = str(i) + ". "
 			print "%s%s (%s)" % (number, story.title, story.url)
-			print (" " * len(number) + 
-				   "by %s (%s comments)" % (story.author,
-				   							story.comments_count))
+			print " " * len(number) + story.subtext
 
-
+	def default(self, cmd):
+		if cmd in ['exit', 'quit']:
+			sys.exit()
 
 
 def main():
