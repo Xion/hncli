@@ -19,7 +19,7 @@ setup(name="hncli",
 
 	  install_requires=[
 	     'requests',
-	     'BeautifulSoup',
+	     'beautifulsoup4',
 	  ],
 
 	  packages=find_packages(),
