@@ -72,10 +72,10 @@ class HackerNews(cmd.Cmd):
 		password = getpass.getpass()
 		auth_token = hn.login(user, password)
 		if auth_token:
-			print "Login successful."
 			self.user['token'] = auth_token
+			self.last_page = hn.fetch_hn_page('/', auth_token)	# for prompt
 		else:
-			print "Login failed."
+			print "Authentication failed."
 
 	def postcmd(self, stop, line):
 		''' Post-command hook. Modifies the prompt to show
@@ -83,11 +83,13 @@ class HackerNews(cmd.Cmd):
 		'''
 		if not self.last_page:
 			return
-		self.user = hn.get_user_info(self.last_page)
-		if self.user:
+		user = hn.get_user_info(self.last_page) or {}
+		if user:
+			self.user.update(user)
 			self.prompt = "%s:%s@%s " % (
 				self.user['name'], self.user['points'], self.PROMPT)
 		else:
+			self.user = {}
 			self.prompt = self.PROMPT + " "
 
 	def do_open(self, story):
