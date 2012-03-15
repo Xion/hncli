@@ -3,6 +3,8 @@ Handling Hacker News stories.
 '''
 from re import compile as regex
 
+from .utils import cast
+
 
 class Story(object):
 	''' Holds information about single HN story. '''
@@ -56,13 +58,3 @@ class Story(object):
 			return self.time
 		return "%s points by %s %s | %s comments" % (
 			self.points, self.author, self.time, self.comments_count)
-
-
-def cast(type_, val, default=None):
-	''' Casts value to given type with optional default. '''
-	if default is None:
-		return type_(val)
-	try:
-		return type_(val)
-	except ValueError:
-		return default

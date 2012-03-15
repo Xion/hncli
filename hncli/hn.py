@@ -25,6 +25,23 @@ def fetch_hn_page(page='/', auth_token=None):
 	html = requests.get(**request_args).text
 	return BeautifulSoup(html)
 
+
+def get_user_info(page='/'):
+	''' Gets HN user info from given page. '''
+	if isinstance(page, basestring):
+		page = fetch_hn_page(page)
+
+	top_table = page.find('table').find('table')
+	user_td = top_table.find_all('td')[-1]
+	user_span = user_td.find('span', {'class': 'pagetop'})
+	user_link = user_span.find('a', href=regex(r'user\?id\=.+'))
+	if not user_link:
+		return # not logged in
+
+	name = user_link.text
+	points = regex(r'\((\d+)\)').search(user_span.text).group(1)
+	return {'name': name, 'points': points}
+
 def login(user, password):
 	''' Attempts to login to Hacker News.
 	Returns authentication token (from cookie)
@@ -41,7 +58,8 @@ def login(user, password):
 	resp = requests.post(URL + '/y', data=data)
 	return resp.cookies.get('user')
 
-def get_recent_stories(count=10, page='/'):
+
+def get_recent_stories(page='/', count=None):
 	''' Gets the most recent stories from HN. '''
 	if isinstance(page, basestring):
 		page = fetch_hn_page(page)
@@ -50,26 +68,11 @@ def get_recent_stories(count=10, page='/'):
 	news_trs = news_table.find_all('tr')[:-3]	# last 3 is garbage
 	del news_trs[2::3]							# every third row is separator
 	items = zip(*([iter(news_trs)] * 2))		# stories span two rows
+	if count is not None:
+		items = items[:count]
 
-	for item in items[:count]:
+	for item in items:
 		story = Story.from_html(*item)
 		if not story.url.startswith('http'):
 			story.url = URL + '/' + story.url
 		yield story
-
-
-def get_user_info(page='/'):
-	''' Gets HN user info from given page. '''
-	if isinstance(page, basestring):
-		page = fetch_hn_page(page)
-
-	top_table = page.find('table').find_all('table')[0]
-	user_td = top_table.find_all('td')[-1]
-	user_span = user_td.find('span', {'class': 'pagetop'})
-	user_link = user_span.find('a', href=regex(r'user\?id\=.+'))
-	if not user_link:
-		return # not logged in
-
-	name = user_link.text
-	points = regex(r'\((\d+)\)').search(user_span.text).group(1)
-	return {'name': name, 'points': points}

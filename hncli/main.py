@@ -10,6 +10,7 @@ import getpass
 import webbrowser
 
 from . import hn
+from .utils import cast
 
 
 class HackerNews(cmd.Cmd):
@@ -34,31 +35,34 @@ class HackerNews(cmd.Cmd):
 		help = command + ":" + os.linesep + help
 		return help
 
-	def _get_stories(self, count, page):
-		if not count or len(str(count).strip()) == 0:
-			count = 10
-		count = int(count)
+	def _get_stories(self, page, count=None):
+		if isinstance(count, basestring):
+			count = count.strip() or None
+		if count is not None:
+			count = cast(int, count, default=10)
+
 		page = hn.fetch_hn_page(page, self.user.get('token'))
 		if page:
 			self.last_page = page
-			return hn.get_recent_stories(count, page)
+			return list(hn.get_recent_stories(page, count))
 
 	def _print_stories(self, stories):
 		stories = stories or []
+		number_width = len(hex(len(stories) - 1)[2:])	# for zero-padding
 		for i, story in enumerate(stories):
-			number = str(i) + ". "
+			number = hex(i)[2:].rjust(number_width, '0') + ": "
 			print "%s%s (%s)" % (number, story.title, story.url)
 			print " " * len(number) + story.subtext
 
 	def do_top(self, count):
 		''' Retrieves the recent top stories (front page). '''
-		stories = self._get_stories(count, '/news')
+		stories = self._get_stories('/news', count)
 		self._print_stories(stories)
 		self.stories['top'] = stories
 
 	def do_new(self, count):
 		''' Retrieves the newest stories. '''
-		stories = self._get_stories(count, '/newest')
+		stories = self._get_stories('/newest', count)
 		self._print_stories(stories)
 		self.stories['new'] = stories
 
@@ -100,13 +104,16 @@ class HackerNews(cmd.Cmd):
 		try:
 			col, idx = re.split(story,  r'\s+|(\s*\:\s*)')
 		except ValueError:
-			col, idx = 'top', int(story)
+			col, idx = 'top', story
 
-		stories = self.stories.get(col)
-		if 0 <= story_idx < len(stories):
-			webbrowser.open(stories[story_idx].url)
-		else:
-			print "*** Unkown story: %s" % story
+		idx = cast(lambda v: int(v, 16), idx, None)
+		if idx is not None:
+			stories = self.stories.get(col)
+			if 0 <= idx < len(stories):
+				webbrowser.open(stories[idx].url)
+				return
+
+		print "*** Unkown story: %s" % story
 
 	def do_help(self, command):
 		''' Display help for given command. '''
