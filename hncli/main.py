@@ -125,8 +125,29 @@ class HackerNews(cmd.Cmd):
 		cmd.Cmd.do_help(self, command)
 
 	def default(self, command):
-		if command in ['exit', 'quit']:
-			sys.exit()
+		''' Executed when command cannot be (easily) recognized.
+		It first try to make a simple prefix-based match
+		and delegates execution to base Cmd logic should it fail.
+		'''
+		def make_cmd_func(name):
+			return lambda arg: self.onecmd('%s %s' % (name, arg))
+
+		# not quite a prefix tree :)
+		commands = {}
+		commands['exit'] = commands['quit'] = lambda _: sys.exit()
+		for name, m in self.__class__.__dict__.iteritems():
+			if not (callable(m) and name.startswith('do_')):
+				continue
+			name = name[len('do_'):]
+			commands[name] = make_cmd_func(name)
+
+		# look for a single match
+		parts = command.split()
+		matches = [c for c in commands if c.startswith(parts[0])]
+		if len(matches) == 1:
+			cmd_func = commands[matches[0]]
+			arg = parts[1] if len(parts) > 1 else ''
+			cmd_func(arg)
 		else:
 			cmd.Cmd.default(self, command)
 
