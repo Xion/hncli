@@ -6,6 +6,7 @@ import cmd
 import sys
 import os
 import re
+import getpass
 import webbrowser
 
 from . import hn
@@ -37,7 +38,7 @@ class HackerNews(cmd.Cmd):
 		if not count or len(str(count).strip()) == 0:
 			count = 10
 		count = int(count)
-		page = hn.fetch_hn_page(page)
+		page = hn.fetch_hn_page(page, self.user.get('token'))
 		if page:
 			self.last_page = page
 			return hn.get_recent_stories(count, page)
@@ -61,14 +62,30 @@ class HackerNews(cmd.Cmd):
 		self._print_stories(stories)
 		self.stories['new'] = stories
 
+	def do_auth(self, user):
+		''' Login to Hacker News as given user. '''
+		user = user.strip()
+		if not user:
+			print "*** No username provided"
+			return
+
+		password = getpass.getpass()
+		auth_token = hn.login(user, password)
+		if auth_token:
+			print "Login successful."
+			self.user['token'] = auth_token
+		else:
+			print "Login failed."
+
 	def postcmd(self, stop, line):
 		''' Post-command hook. Modifies the prompt to show
-		information about HN user, if any. '''
+		information about HN user, if any.
+		'''
 		if not self.last_page:
 			return
 		self.user = hn.get_user_info(self.last_page)
 		if self.user:
-			self.prompt = "%s(%s)@%s " % (
+			self.prompt = "%s:%s@%s " % (
 				self.user['name'], self.user['points'], self.PROMPT)
 		else:
 			self.prompt = self.PROMPT + " "
