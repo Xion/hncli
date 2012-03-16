@@ -76,3 +76,81 @@ def get_recent_stories(page='/', count=None):
 		if not story.url.startswith('http'):
 			story.url = URL + '/' + story.url
 		yield story
+
+
+## Comments
+
+class Comment(object):
+	''' Holds information about single HN comment. '''
+
+	__slots__ = ['story_id', 'author', 'url', 'text', 'time',
+				 'level', 'parent', 'replies', 'reply_url']
+
+	def __init__(self, **kw):
+		for k in self.__slots__:
+			setattr(self, k, kw.get(k, ''))
+
+	def add_reply(self, reply):
+		''' Adds given comment as reply to this one. '''
+		self.replies.append(reply)
+		reply.parent = self
+
+	@staticmethod
+	def from_html(story_id, tag):
+		''' Constructs the Comment from HN site markup.
+		'tag' argument is BeatifulSoup object for
+		<span> tag with class=comment.
+		'''
+		if not (tag.name == 'span' and 'comment' in tag['class']):
+			return
+
+		parent_tr = tag.find_parent('tr')
+		head_span = parent_tr.find('span', {'class': 'comhead'})
+		indent_img = parent_tr.find('img', src=regex(r'.*/images/s\.gif'))
+
+		comment = {
+			'story_id': story_id,
+			'author': head_span.find('a', href=regex(r'user\?id\=.+')).text,
+			'url': head_span.find('a', href=regex(r'item\?id\=\d+'))['href'],
+			'text': tag.text.strip(),
+			'time': list(head_span.strings)[-2].replace('|', '').strip(),
+			'level': int(indent_img['width']) / 40, # magic number of pixels
+			'parent': None,
+			'replies': [],
+			'reply_url': parent_tr.find('a', href=regex(r'reply\?.+'))['href'],
+		}
+		return Comment(**comment)
+
+
+def get_comments(item_id, auth_token=None):
+	''' Retrieves comments for item of given ID.
+	Returns list of top-level comments.
+	'''
+	url = 'item?id=' + str(item_id)
+	page = fetch_hn_page(url, auth_token)
+	if not page:
+		return
+
+	comments_table = page.find('table').find_all('table')[2]
+	comment_spans = comments_table.find_all('span', {'class': 'comment'})
+	if not comment_spans:
+		return []
+
+	comments = [Comment.from_html(item_id, span)
+				for span in comment_spans]
+
+	# use order of comments and their levels
+	# to reconstruct hierarchy of replies
+	stack = [] ; last = comments[0]
+	for comment in comments[1:]:
+		if comment.level > last.level: 	# reply to last
+			last.add_reply(comment)
+			stack.append(last)
+		else: 	# reply to parent or top-level comment
+			level_diff = last.level - comment.level
+			stack = stack[:-level_diff]
+			if stack:
+				stack[-1].add_reply(comment)
+		last = comment
+
+	return [c for c in comments if c.level == 0]

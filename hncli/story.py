@@ -9,7 +9,7 @@ from .utils import cast
 class Story(object):
 	''' Holds information about single HN story. '''
 
-	__slots__ = ['title', 'url', 'author', 'points', 'time', 
+	__slots__ = ['id', 'title', 'url', 'author', 'points', 'time', 
 				 'comments_count', 'comments_url',
 				 'upvote_url', 'downvote_url']
 
@@ -30,10 +30,10 @@ class Story(object):
 
 		story = {'title': link.text, 'url': link['href']}
 		if not_job:
-			comments_count = cast(int, comments_link.text.split()[0],
-								  default=0)
 			points = cast(int, subtext.find('span', id=regex(r'score_\d+')
 											).text.split()[0], default=0)
+			comments_count = cast(int, comments_link.text.split()[0],
+								  default=0)
 			story.update({
 				'author': subtext.find('a', href=regex(r'user\?id\=.+')).text,
 				'points': points,
@@ -42,9 +42,12 @@ class Story(object):
 				'comments_url': comments_link['href'],
 				'upvote_url': vote_td.find('a', id=regex(r'up_\d+'))['href'],
 			})
+			url = story['comments_url']
 		else:
 			story['time'] = subtext.text
+			url = story['url']
 
+		story['id'] = int(url[url.find('=')+1:])
 		return Story(**story)
 
 	@property

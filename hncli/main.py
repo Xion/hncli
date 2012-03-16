@@ -16,6 +16,7 @@ from .utils import cast
 class HackerNews(cmd.Cmd):
 	''' Command-line shell for Hacker News. '''
 	PROMPT = "hn$"
+	COMMENT_MAX_LEN = 128
 
 	def __init__(self, *args, **kwargs):
 		cmd.Cmd.__init__(self, *args, **kwargs)	# cmd.Cmd is old-style class!
@@ -35,7 +36,7 @@ class HackerNews(cmd.Cmd):
 		help = command + ":" + os.linesep + help
 		return help
 
-	def _get_stories(self, page, count=None):
+	def _retrieve_stories(self, page, count=None):
 		if isinstance(count, basestring):
 			count = count.strip() or None
 		if count is not None:
@@ -54,15 +55,28 @@ class HackerNews(cmd.Cmd):
 			print "%s%s (%s)" % (number, story.title, story.url)
 			print " " * len(number) + story.subtext
 
+	def _get_story(self, story):
+		''' Returns a story for given "pointer", e.g. top:5. '''
+		try:
+			col, idx = re.split(story,  r'\s+|(\s*\:\s*)')
+		except ValueError:
+			col, idx = 'top', story
+
+		idx = cast(lambda v: int(v, 16), idx, None)
+		if idx is not None:
+			stories = self.stories.get(col, [])
+			if 0 <= idx < len(stories):
+				return stories[idx]
+
 	def do_top(self, count):
 		''' Retrieves the recent top stories (front page). '''
-		stories = self._get_stories('/news', count)
+		stories = self._retrieve_stories('/news', count)
 		self._print_stories(stories)
 		self.stories['top'] = stories
 
 	def do_new(self, count):
 		''' Retrieves the newest stories. '''
-		stories = self._get_stories('/newest', count)
+		stories = self._retrieve_stories('/newest', count)
 		self._print_stories(stories)
 		self.stories['new'] = stories
 
@@ -96,24 +110,28 @@ class HackerNews(cmd.Cmd):
 			self.user = {}
 			self.prompt = self.PROMPT + " "
 
-	def do_open(self, story):
+	def do_open(self, s):
 		''' Opens given story in a browser.
 		Story is identified as an index, optionally preceeded
 		by 'top' or 'new' and colon, e.g. top:5.
 		'''
-		try:
-			col, idx = re.split(story,  r'\s+|(\s*\:\s*)')
-		except ValueError:
-			col, idx = 'top', story
+		story = self._get_story(s)
+		if story:
+			webbrowser.open(story.url)
+		else:
+			print "*** Unkown story: " + s
 
-		idx = cast(lambda v: int(v, 16), idx, None)
-		if idx is not None:
-			stories = self.stories.get(col)
-			if 0 <= idx < len(stories):
-				webbrowser.open(stories[idx].url)
-				return
-
-		print "*** Unkown story: %s" % story
+	def do_comments(self, s):
+		''' Shows top-level comments for given story. '''
+		story = self._get_story(s)
+		if not story:
+			print "*** Unknown story: " + s
+			return
+		comments = hn.get_comments(story.id, self.user.get('token'))
+		for c in comments:
+			print "%s (%s):\n  %s%s" % (c.author, c.time,
+				c.text[:self.COMMENT_MAX_LEN],
+				"..." if len(c.text) > self.COMMENT_MAX_LEN else "")
 
 	def do_help(self, command):
 		''' Display help for given command. '''
@@ -160,7 +178,7 @@ def main():
 	hncli.intro = "\n".join([
 		"hncli :: command-line interface for Hacker News",
 		"[Python %s on %s]" % (sys.version.splitlines()[0], sys.platform),
-		"Use 'help' or type 'top' for front page stories.",
+		"Type 'help' for instructions or 'top' for front page stories.",
 	])
 	hncli.prompt = hncli.PROMPT + " "
 
