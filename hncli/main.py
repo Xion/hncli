@@ -10,13 +10,12 @@ import getpass
 import webbrowser
 
 from . import hn
-from .utils import cast
+from .utils import cast, get_terminal_size, break_lines
 
 
 class HackerNews(cmd.Cmd):
 	''' Command-line shell for Hacker News. '''
 	PROMPT = "hn$"
-	COMMENT_MAX_LEN = 128
 
 	def __init__(self, *args, **kwargs):
 		cmd.Cmd.__init__(self, *args, **kwargs)	# cmd.Cmd is old-style class!
@@ -127,11 +126,27 @@ class HackerNews(cmd.Cmd):
 		if not story:
 			print "*** Unknown story: " + s
 			return
+		
 		comments = hn.get_comments(story.id, self.user.get('token'))
-		for c in comments:
-			print "%s (%s):\n  %s%s" % (c.author, c.time,
-				c.text[:self.COMMENT_MAX_LEN],
-				"..." if len(c.text) > self.COMMENT_MAX_LEN else "")
+		if not comments:
+			print "No comments for this story"
+
+		console_width, _ = get_terminal_size()
+		for i, c in enumerate(comments):
+			last = i + 1 == len(comments)
+			level = c.level + 1 # sometimes you actually want to count from 1
+			
+			line_indent = ("|" if not last else " ") + " " * (3 * level - 1)
+			lines = break_lines(c.text,
+								int(console_width * 0.95) - len(line_indent))
+			indented_text = "\n".join(line_indent + line
+									  for line in lines)
+			header_indent = "+" + "-" * (3 * level - 2) + " "
+
+			print "%s%s (%s):\n%s" % (header_indent,
+				c.author, c.time, indented_text)
+			if not last:
+				print "|"
 
 	def do_help(self, command):
 		''' Display help for given command. '''

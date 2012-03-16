@@ -107,6 +107,7 @@ class Comment(object):
 		parent_tr = tag.find_parent('tr')
 		head_span = parent_tr.find('span', {'class': 'comhead'})
 		indent_img = parent_tr.find('img', src=regex(r'.*/images/s\.gif'))
+		reply_link = parent_tr.find('a', href=regex(r'reply\?.+'))
 
 		comment = {
 			'story_id': story_id,
@@ -117,14 +118,14 @@ class Comment(object):
 			'level': int(indent_img['width']) / 40, # magic number of pixels
 			'parent': None,
 			'replies': [],
-			'reply_url': parent_tr.find('a', href=regex(r'reply\?.+'))['href'],
+			'reply_url': reply_link['href'] if reply_link else None,
 		}
 		return Comment(**comment)
 
 
 def get_comments(item_id, auth_token=None):
 	''' Retrieves comments for item of given ID.
-	Returns list of top-level comments.
+	Returns list of all the comments.
 	'''
 	url = 'item?id=' + str(item_id)
 	page = fetch_hn_page(url, auth_token)
@@ -153,4 +154,4 @@ def get_comments(item_id, auth_token=None):
 				stack[-1].add_reply(comment)
 		last = comment
 
-	return [c for c in comments if c.level == 0]
+	return comments
