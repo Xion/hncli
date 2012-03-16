@@ -15,6 +15,20 @@ setup(name="hncli",
 	  license="MIT",
 
 	  classifiers=[
+	     "Development Status :: 2 - Pre-Alpha",
+	     "Environment :: Console",
+	     "Intended Audience :: Developers",
+	     "Intended Audience :: End Users/Desktop",
+	     "Intended Audience :: Information Technology",
+	     "Intended Audience :: System Administrators",
+	     "License :: OSI Approved :: MIT License",
+	     "Natural Language :: English",
+	     "Operating System :: OS Independent",
+	     "Programming Language :: Python",
+	     "Topic :: Internet",
+	     "Topic :: Internet :: WWW/HTTP",
+	     "Topic :: Internet :: WWW/HTTP :: Dynamic Content :: Message Boards",
+	     "Topic :: Internet :: WWW/HTTP :: Dynamic Content :: News/Diary",
 	  ],
 
 	  install_requires=[
