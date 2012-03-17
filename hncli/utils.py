@@ -7,59 +7,59 @@ import re
 _none = object()
 
 def cast(type_, val, default=_none):
-	''' Casts value to given type with optional default. '''
-	if default is _none:
-		return type_(val)
-	try:
-		return type_(val)
-	except ValueError:
-		return default
+    ''' Casts value to given type with optional default. '''
+    if default is _none:
+        return type_(val)
+    try:
+        return type_(val)
+    except ValueError:
+        return default
 
 
 def break_lines(text, max_length):
-	''' Breaks given text into lines of given maximum length.
-	Lines are only broken at the word boundaries.
-	This function functions if text contains words longer
-	than the maximum.
-	'''
-	words = re.split(r'\s+', text)
+    ''' Breaks given text into lines of given maximum length.
+    Lines are only broken at the word boundaries.
+    This function functions if text contains words longer
+    than the maximum.
+    '''
+    words = re.split(r'\s+', text)
 
-	res = []
-	line = ""
-	while words:
-		word = words[0]
-		if len(line + word) <= max_length:
-			line += word
-			if len(words) > 1:
-				line += " "
-			words = words[1:]
-		else:
-			res.append(line)
-			line = ""
+    res = []
+    line = ""
+    while words:
+        word = words[0]
+        if len(line + word) <= max_length:
+            line += word
+            if len(words) > 1:
+                line += " "
+            words = words[1:]
+        else:
+            res.append(line)
+            line = ""
 
-	if line:
-		res.append(line)
-	return res
+    if line:
+        res.append(line)
+    return res
 
 
 ## Getting terminal size
 ## (from: http://stackoverflow.com/a/6550596/434799)
 
 def get_terminal_size():
-	''' Retrieves size of terminal as 2-tuple: (width, height) '''
-	import platform
-	current_os = platform.system()
-	tuple_xy = None
-	if current_os == 'Windows':
-	   tuple_xy = _get_terminal_size__windows()
-	   if tuple_xy is None:
-	      tuple_xy = _get_terminal_size__tput()
-	      # needed for window's python in cygwin's xterm!
-	if current_os in ['Linux', 'Darwin'] or current_os.startswith('CYGWIN'):
-	   tuple_xy = _get_terminal_size__posix()
-	if tuple_xy is None:
-	   tuple_xy = (80, 25)      # default value
-	return tuple_xy
+    ''' Retrieves size of terminal as 2-tuple: (width, height) '''
+    import platform
+    current_os = platform.system()
+    tuple_xy = None
+    if current_os == 'Windows':
+       tuple_xy = _get_terminal_size__windows()
+       if tuple_xy is None:
+          tuple_xy = _get_terminal_size__tput()
+          # needed for window's python in cygwin's xterm!
+    if current_os in ['Linux', 'Darwin'] or current_os.startswith('CYGWIN'):
+       tuple_xy = _get_terminal_size__posix()
+    if tuple_xy is None:
+       tuple_xy = (80, 25)      # default value
+    return tuple_xy
 
 def _get_terminal_size__windows():
     res = None
