@@ -1,5 +1,5 @@
 '''
-Handling Hacker News stories.
+Objects representing Hacker News items: stories and comments.
 '''
 from re import compile as regex
 
@@ -8,7 +8,6 @@ from .utils import cast
 
 class Story(object):
 	''' Holds information about single HN story. '''
-
 	__slots__ = ['id', 'title', 'url', 'author', 'points', 'time', 
 				 'comments_count', 'comments_url',
 				 'upvote_url', 'downvote_url']
@@ -61,3 +60,45 @@ class Story(object):
 			return self.time
 		return "%s points by %s %s | %s comments" % (
 			self.points, self.author, self.time, self.comments_count)
+
+
+class Comment(object):
+	''' Holds information about single HN comment. '''
+	__slots__ = ['story_id', 'author', 'url', 'text', 'time',
+				 'level', 'parent', 'replies', 'reply_url']
+
+	def __init__(self, **kw):
+		for k in self.__slots__:
+			setattr(self, k, kw.get(k, ''))
+
+	def add_reply(self, reply):
+		''' Adds given comment as reply to this one. '''
+		self.replies.append(reply)
+		reply.parent = self
+
+	@staticmethod
+	def from_html(story_id, tag):
+		''' Constructs the Comment from HN site markup.
+		'tag' argument is BeatifulSoup object for
+		<span> tag with class=comment.
+		'''
+		if not (tag.name == 'span' and 'comment' in tag['class']):
+			return
+
+		parent_tr = tag.find_parent('tr')
+		head_span = parent_tr.find('span', {'class': 'comhead'})
+		indent_img = parent_tr.find('img', src=regex(r'.*/images/s\.gif'))
+		reply_link = parent_tr.find('a', href=regex(r'reply\?.+'))
+
+		comment = {
+			'story_id': story_id,
+			'author': head_span.find('a', href=regex(r'user\?id\=.+')).text,
+			'url': head_span.find('a', href=regex(r'item\?id\=\d+'))['href'],
+			'text': tag.text.strip(),
+			'time': list(head_span.strings)[-2].replace('|', '').strip(),
+			'level': int(indent_img['width']) / 40, # magic number of pixels
+			'parent': None,
+			'replies': [],
+			'reply_url': reply_link['href'] if reply_link else None,
+		}
+		return Comment(**comment)
