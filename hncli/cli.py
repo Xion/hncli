@@ -43,6 +43,17 @@ class HackerNews(cmd.Cmd):
         '''
         self.prompt = self._format_prompt()
 
+    def onecmd(self, line):
+        ''' Executing single command. But actually, there might
+        be multiple commands separated by && so we support it here.
+        '''
+        if not '&&' in line:
+            return cmd.Cmd.onecmd(self, line)
+
+        cmds = [s.strip() for s in line.split('&&')]
+        retvals = map(self.onecmd, cmds)
+        return retvals[-1]
+
     def _help(self, command):
         ''' Returns the help text for given command. '''
         method = getattr(self, 'do_' + command, None)
