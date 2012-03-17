@@ -10,7 +10,7 @@ from .utils import cast
 
 
 class Client(object):
-	''' A client for Hacker News website, accessing the it via HTTP
+	''' A client for Hacker News website, accessing it via HTTP
 	and parsing incoming HTML to extract useful information.
 	'''
 	BASE_URL = "http://news.ycombinator.com"

@@ -14,13 +14,32 @@ from .utils import cast, get_terminal_size, break_lines
 
 class HackerNews(cmd.Cmd):
 	''' Command-line shell for Hacker News. '''
-	PROMPT = "hn$"
 
 	def __init__(self, *args, **kwargs):
 		cmd.Cmd.__init__(self, *args, **kwargs)	# cmd.Cmd is old-style class!
-		self.prompt = self.PROMPT + " "
 		self.hn_client = hn.Client()
-		self.stories = {}
+		self.path = []	# child "directories" relative to root
+		self.prompt = self._format_prompt()
+
+	def _format_prompt(self):
+		''' Formats the prompt, showing current user (if any)
+		and "path" within the Hacker News website.
+		'''
+		if self.hn_client.authenticated:
+			user = self.hn_client.user_name
+			points = self.hn_client.user_points
+		else:
+			user, points = "anonymous", 0
+		pwd = '/' + '/'.join(self.path)
+
+		prompt = "{user}({points})@hn:{pwd}$ "
+		return prompt.format(**locals())
+
+	def postcmd(self, stop, line):
+		''' Post-command hook. Modifies the prompt to show
+		information about HN user, if any.
+		'''
+		self.prompt = self._format_prompt()
 
 	def _help(self, command):
 		''' Returns the help text for given command. '''
@@ -91,16 +110,6 @@ class HackerNews(cmd.Cmd):
 		success = self.hn_client.login(user, password)
 		if not success:
 			print "Authentication failed."
-
-	def postcmd(self, stop, line):
-		''' Post-command hook. Modifies the prompt to show
-		information about HN user, if any.
-		'''
-		if self.hn_client.authenticated:
-			self.prompt = "%s:%s@%s " % (self.hn_client.user_name,
-				self.hn_client.user_points, self.PROMPT)
-		else:
-			self.prompt = self.PROMPT + " "
 
 	def do_open(self, s):
 		''' Opens given story in a browser.
