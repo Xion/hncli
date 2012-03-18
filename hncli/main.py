@@ -16,7 +16,7 @@ def main():
         "[running Python %s on %s]" % (
             sys.version.splitlines()[0], sys.platform),
         "Type `help` for instructions, "
-        "or `cd top && ls` for front page stories.",
+        "or `ls top` for front page stories.",
     ])
 
     hncli.doc_header = "Supported commands"

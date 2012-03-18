@@ -37,6 +37,23 @@ class HackerNews(cmd.Cmd):
         prompt = "{user}{points}@hn:{pwd}$ "
         return prompt.format(**locals())
 
+    def _absolute_path(self, path):
+        ''' Converts given path into absolute one,
+        based on current "directory".
+        Does nothing if path is already absolute.
+        '''
+        path = path.strip()
+        if not path:
+            path = '.'
+
+        if path.startswith('/'):
+            pwd = path
+        else:
+            pwd = os.path.join(self.pwd, path)
+            pwd = os.path.normpath(pwd)
+
+        return pwd
+
     def postcmd(self, stop, line):
         ''' Post-command hook. Modifies the prompt to show
         information about HN user, if any.
@@ -88,20 +105,10 @@ class HackerNews(cmd.Cmd):
         This command should behave like regular shell's cd
         and handle both absolute and relative paths with .. and .
         '''
-        path = path.strip()
-        if not path:
-            path = '.'
-
-        if path.startswith('/'):
-            pwd = path
-        else:
-            pwd = os.path.join(self.pwd, path)
-            pwd = os.path.normpath(pwd)
-
-        self.pwd = pwd
+        self.pwd = self._absolute_path(path)
 
     def do_ls(self, args):
-        ''' Lists items in current "directory". Dependning on where
+        ''' Lists items in current "directory". Depending on where
         we are, this can output several different types of results,
         including stories and comments.
         '''
@@ -130,7 +137,8 @@ class HackerNews(cmd.Cmd):
                     print "ls: no comments for this story"
                 return format_comments(comments)
 
-        res = ls(self.pwd)
+        pwd = self._absolute_path(args)
+        res = ls(pwd)
         if res: print res
 
 
@@ -148,10 +156,11 @@ class HackerNews(cmd.Cmd):
 
     def do_open(self, s):
         ''' Opens given story in a browser.
-        Story is identified as an index, optionally preceeded
-        by 'top' or 'new' and colon, e.g. top:5.
+        Story is identified by a path that includes
+        "directory" name and a hexademical index, e.g. /top/1e.
         '''
-        story = self._get_story(s)
+        pwd = self._absolute_path(s)[1:]
+        story = self._get_story(*pwd.split('/', 1))
         if story:
             webbrowser.open(story.url)
         else:
