@@ -47,6 +47,28 @@ class Client(object):
             self._retrieve_user_info(soup)
         return soup
 
+    def _fetch_item_page(self, item_id):
+        ''' Retrieves page for given Hacker News item
+        (either a story or comment).
+        Returns the BeautifulSoup object with parsed HTML.
+        '''
+        url = 'item?id=' + str(item_id)
+        return self._fetch_page(url)
+
+    def _obtain_fnid(self, page):
+        ''' Retrieves the 'fnid' token from given Hacker News page.
+        fnid is a kind of CSRF token which has quite short expiration time
+        (few minutes tops), so it's required that we obtain it
+        before performing a POST.
+        '''
+        if isinstance(page, basestring):
+            page = self._fetch_page(page)
+
+        fnid = page.find('input', {'name': 'fnid'})
+        if not fnid:
+            return None
+        return fnid['value']
+
     def _retrieve_user_info(self, page='/'):
         ''' Gets HN user info from given page.
         A page is either an URL or BeautifulSoup object.
@@ -81,12 +103,9 @@ class Client(object):
         `retrieve_info` parameter indicates whether we should automatically
         obtain user information after successful login.
         '''
-        # we need login page to get 'fnid' which
-        # looks like a kind of CSRF/expiration token
-        login_page = self._fetch_page('/newslogin')
-        if not login_page:
+        fnid = self._obtain_fnid('/newslogin')
+        if not fnid:
             return False
-        fnid = login_page.find('input', {'name': 'fnid'})['value']
 
         data = {'fnid': fnid, 'u': user, 'p': password}
         resp = requests.post(self._hn_url('y'), data=data)
@@ -129,7 +148,7 @@ class Client(object):
         '''
         if isinstance(item_or_url, (basestring, int, long)):
             item_id = cast(int, item_or_url)
-            url = '/item?id=' + str(item_id) if item_id else item_or_url
+            url = 'item?id=' + str(item_id) if item_id else item_or_url
             page = self._fetch_page(url)
 
         comments_table = page.find('table').find_all('table')[2]
@@ -155,3 +174,23 @@ class Client(object):
             last = comment
 
         return [c for c in comments if c.level == 0]
+
+    def post_comment(self, item_id, text):
+        ''' Posts a comment in reply to given item. The item can be
+        either a story or some other comment we'll be replying to.
+        Returns True or False, depending on whether posting succeeded.
+        Note that user must be logged in to perform this action.
+        '''
+        if not self.authenticated:
+            return False
+
+        # retrieve the 'fnid' CSRF token
+        page = self._fetch_item_page(item_id)
+        if not page:
+            return False
+        fnid = self._obtain_fnid(page)
+
+        data = {'fnid': fnid, 'text': text}
+        resp = requests.post(self._hn_url('r'), data=data)
+        return True
+
