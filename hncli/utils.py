@@ -2,6 +2,9 @@
 Utility module.
 '''
 import re
+import tempfile
+import os
+import subprocess
 
 
 _none = object()
@@ -40,6 +43,73 @@ def break_lines(text, max_length):
     if line:
         res.append(line)
     return res
+
+
+## Obtaining long input using a console editor
+
+def long_input(prompt):
+    ''' Prompts the user for a really long input by opening a text
+    editor with a temporary file. The file is prefilled with given
+    prompt text as commented-out lines (with #), but the first two
+    lines are empty as this is where the user is intended to
+    type their input.
+    '''
+    editor = get_console_editor()
+    if not editor:
+        return None
+
+    fd, filename = tempfile.mkstemp(text=True)
+    
+    # set the file contents to given prompt and instructions
+    f = os.fdopen(fd)
+    f.write(os.linesep * 2)
+    for line in str(prompt).splitlines():
+        print "# " + line
+    print "# Lines starting with hash (#) are ignored"
+    print "# and empty input will abort the operation."
+    os.close(fd)
+
+    # let user edit the file
+    edit_cmd = '%s "%s"' % (editor, filename)
+    edit_retcode = shell(edit_cmd)
+    if edit_retcode != 0:
+        return None
+
+    # open the file again and read the input
+    with open(filename) as f:
+        lines = [line for line in f.readlines()
+                 if not line.strip().startswith('#')]
+        user_input = os.linesep.join(line for line in lines)
+        is_empty_input = not bool(user_input.strip())
+        if is_empty_input:
+            return None
+
+    os.remove(filename)
+    return user_input
+
+def get_console_editor():
+    ''' Gets the name of console editor which can be used on this system.
+    Heuristics used by this functions are rather primitive: it basically
+    tries out some common variants.
+    '''
+    env_editor = os.environ.get('EDITOR')
+    if env_editor:
+        return env_editor
+
+    editors = ['vim', 'emacs', 'nano', 'vi']
+    for ed in editors:
+        exit_code = shell('which ' + ed)
+        if exit_code == 0:
+            return ed 
+
+def shell(cmd):
+    ''' Executes given shell command. It uses the subprocess module
+    rather than typical os.system().
+    '''
+    try:
+        return subprocess.call(cmd, shell=True)
+    except OSError, e:
+        return -127
 
 
 ## Getting terminal size
@@ -99,7 +169,6 @@ def _get_terminal_size__tput():
        return (cols,rows)
     except:
        return None
-
 
 def _get_terminal_size__posix():
     def ioctl_GWINSZ(fd):

@@ -199,6 +199,8 @@ class HackerNews(cmd.Cmd):
         pass # do nothing (and don't repeat last command)
 
 
+## Displaying content
+
 def format_stories(stories):
     ''' Formats a list Story objects, producing text output. '''
     if not stories:
@@ -212,6 +214,7 @@ def format_stories(stories):
         lines.append("%s%s | id=%s" % (" " * len(number), story.subtext, story.id))
 
     return os.linesep.join(lines)
+
 
 def format_comments(comments, indent_width=4, recursive=True):
     ''' Formats a list of Comment objects, producing text output. '''
