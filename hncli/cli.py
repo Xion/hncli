@@ -15,11 +15,14 @@ from .utils import cast, get_terminal_size, break_lines
 class HackerNews(cmd.Cmd):
     ''' Command-line shell for Hacker News. '''
     ROOT_DIRS = ['top', 'new', 'threads', 'comments', 'ask', 'jobs']
+    ALL_STORIES_DIRS = ['all', 'stories', 's']
 
     def __init__(self, *args, **kwargs):
         cmd.Cmd.__init__(self, *args, **kwargs) # cmd.Cmd is old-style class!
         self.hn_client = hn.Client()
-        self.stories = {}
+        self.story_dirs = {}    # root_dir -> list of IDs
+        self.stories = {}       # story_id -> Story object
+
         self.pwd = "/"
         self.prompt = self._format_prompt()
 
@@ -93,9 +96,17 @@ class HackerNews(cmd.Cmd):
         return list(stories)
 
     def _get_story(self, dir, s):
+        ''' Retrieves a Story object based on its Hacker News ID
+        or position within one of the root "directories".
+        '''
+        if dir is None or dir in self.ALL_STORIES_DIRS:
+            story_id = cast(int, s, None)    # actual HN story ID
+            return self.stories.get(story_id)
+
+        # here we assume we deal with index (position) within a directory
         idx = cast(lambda v: int(v, 16), s, None)
         if idx is not None:
-            stories = self.stories.get(dir, [])
+            stories = self.story_dirs.get(dir, [])
             if 0 <= idx < len(stories):
                 return stories[idx]
 
@@ -117,7 +128,7 @@ class HackerNews(cmd.Cmd):
                 return '\t'.join(self.ROOT_DIRS)
             pwd = pwd.lstrip('/')
             
-            # handle root "directories" and stories inside them
+            # handle root "directories"
             story_pages = {
                 'top': '/news',
                 'new': '/newest',
@@ -126,9 +137,14 @@ class HackerNews(cmd.Cmd):
             }
             if pwd in story_pages:
                 stories = self._retrieve_stories(story_pages[pwd])
-                self.stories[pwd] = stories
+                for story in stories:
+                    self.stories[story.id] = story
+                self.stories[pwd] = [s.id for s in stories]
                 return format_stories(stories)
-            if any(pwd.startswith(sp) for sp in story_pages):
+
+            # handle stories, displaying their comments
+            story_dirs = story_pages.keys() + self.ALL_STORIES_DIRS
+            if any(pwd.startswith(sp + '/') for sp in story_dirs):
                 story = self._get_story(*pwd.split('/', 1))
                 if not story:
                     return "ls: cannot list items at this location"
@@ -193,7 +209,7 @@ def format_stories(stories):
     for i, story in enumerate(stories):
         number = hex(i)[2:].rjust(number_width, '0') + ": "
         lines.append("%s%s (%s)" % (number, story.title, story.url))
-        lines.append(" " * len(number) + story.subtext)
+        lines.append("%s%s | id=%s" % (" " * len(number), story.subtext, story.id))
 
     return os.linesep.join(lines)
 
