@@ -189,6 +189,8 @@ class Client(object):
         if not page:
             return False
         fnid = self._obtain_fnid(page)
+        if not fnid:
+            return False
 
         data = {'fnid': fnid, 'text': text}
         resp = requests.post(self._hn_url('r'), data=data)

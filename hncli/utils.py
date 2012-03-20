@@ -58,12 +58,15 @@ def long_input(prompt):
     if not editor:
         return None
 
+    if not isinstance(prompt, basestring):
+        prompt = os.linesep.join(prompt)
+
     fd, filename = tempfile.mkstemp(text=True)
     
     # set the file contents to given prompt and instructions
     f = os.fdopen(fd)
     f.write(os.linesep * 2)
-    for line in str(prompt).splitlines():
+    for line in prompt.splitlines():
         print "# " + line
     print "# Lines starting with hash (#) are ignored"
     print "# and empty input will abort the operation."

@@ -9,7 +9,7 @@ import getpass
 import webbrowser
 
 from . import hn
-from .utils import cast, get_terminal_size, break_lines
+from .utils import cast, get_terminal_size, break_lines, long_input
 
 
 class HackerNews(cmd.Cmd):
@@ -25,6 +25,18 @@ class HackerNews(cmd.Cmd):
 
         self.pwd = "/"
         self.prompt = self._format_prompt()
+
+    def _help(self, command):
+        ''' Returns the help text for given command. '''
+        method = getattr(self, 'do_' + command, None)
+        if not method:
+            return None
+
+        help = method.__doc__.splitlines()
+        help = os.linesep.join('\t' + line.strip()
+                               for line in help)
+        help = command + ":" + os.linesep + help
+        return help
 
     def _format_prompt(self):
         ''' Formats the prompt, showing current user (if any)
@@ -57,34 +69,26 @@ class HackerNews(cmd.Cmd):
 
         return pwd
 
-    def postcmd(self, stop, line):
-        ''' Post-command hook. Modifies the prompt to show
-        information about HN user, if any.
+    def _get_story(self, path):
+        ''' Retrieves a Story object based on its path.
+        The path may point to a story with specific Hacker News ID
+        (e.g. /all/3464219) or to one from recent `ls` call (e.g /top/1e).
         '''
-        self.prompt = self._format_prompt()
+        path = self._absolute_path(path)
+        path = path.lstrip('/')
+        dir, s = path.split('/', 1)
 
-    def onecmd(self, line):
-        ''' Executing single command. But actually, there might
-        be multiple commands separated by && so we support it here.
-        '''
-        if not '&&' in line:
-            return cmd.Cmd.onecmd(self, line)
+        # check whether it is a path with actual HN story ID
+        if dir is None or dir in self.ALL_STORIES_DIRS:
+            story_id = cast(int, s, None)
+            return self.stories.get(story_id)
 
-        cmds = [s.strip() for s in line.split('&&')]
-        retvals = map(self.onecmd, cmds)
-        return retvals[-1]
-
-    def _help(self, command):
-        ''' Returns the help text for given command. '''
-        method = getattr(self, 'do_' + command, None)
-        if not method:
-            return None
-
-        help = method.__doc__.splitlines()
-        help = os.linesep.join('\t' + line.strip()
-                               for line in help)
-        help = command + ":" + os.linesep + help
-        return help
+        # here we assume we deal with index (position) within a directory
+        idx = cast(lambda v: int(v, 16), s, None)
+        if idx is not None:
+            stories = self.story_dirs.get(dir, [])
+            if 0 <= idx < len(stories):
+                return stories[idx]
 
     def _retrieve_stories(self, page, count=None):
         if isinstance(count, basestring):
@@ -94,21 +98,6 @@ class HackerNews(cmd.Cmd):
 
         stories = self.hn_client.get_stories(page, count)
         return list(stories)
-
-    def _get_story(self, dir, s):
-        ''' Retrieves a Story object based on its Hacker News ID
-        or position within one of the root "directories".
-        '''
-        if dir is None or dir in self.ALL_STORIES_DIRS:
-            story_id = cast(int, s, None)    # actual HN story ID
-            return self.stories.get(story_id)
-
-        # here we assume we deal with index (position) within a directory
-        idx = cast(lambda v: int(v, 16), s, None)
-        if idx is not None:
-            stories = self.story_dirs.get(dir, [])
-            if 0 <= idx < len(stories):
-                return stories[idx]
 
 
     def do_cd(self, path):
@@ -145,7 +134,7 @@ class HackerNews(cmd.Cmd):
             # handle stories, displaying their comments
             story_dirs = story_pages.keys() + self.ALL_STORIES_DIRS
             if any(pwd.startswith(sp + '/') for sp in story_dirs):
-                story = self._get_story(*pwd.split('/', 1))
+                story = self._get_story('/' + pwd)
                 if not story:
                     return "ls: cannot list items at this location"
                 comments = self.hn_client.get_comments(story.id)
@@ -180,7 +169,28 @@ class HackerNews(cmd.Cmd):
         if story:
             webbrowser.open(story.url)
         else:
-            print "*** Unkown story: " + s
+            print "*** Unknown story: " + s
+
+    def do_post(self, s):
+        ''' Posts a comment to given story. It opens up a console text editor
+        where user can enter their comment and then posts it.
+        '''
+        story = self._get_story(s)
+        if not story:
+            print "post: could not find story " + s
+
+        if not self.hn_client.authenticated:
+            print "post: you cannot add comments as guest"
+            return
+
+        comment = long_input("Please enter your comment.")
+        if not comment:
+            print "post: adding comment canceled"
+            return
+
+        success = self.hn_client.post_comment(comment)
+        if not success:
+            print "post: failed to post the co"
 
     def do_help(self, command):
         ''' Display help for given command. '''
@@ -194,6 +204,24 @@ class HackerNews(cmd.Cmd):
     def do_exit(self, _):
         ''' Exits the CLI. '''
         sys.exit()
+
+
+    def postcmd(self, stop, line):
+        ''' Post-command hook. Modifies the prompt to show
+        information about HN user, if any.
+        '''
+        self.prompt = self._format_prompt()
+
+    def onecmd(self, line):
+        ''' Executing single command. But actually, there might
+        be multiple commands separated by && so we support it here.
+        '''
+        if not '&&' in line:
+            return cmd.Cmd.onecmd(self, line)
+
+        cmds = [s.strip() for s in line.split('&&')]
+        retvals = map(self.onecmd, cmds)
+        return retvals[-1]
 
     def emptyline(self):
         pass # do nothing (and don't repeat last command)
