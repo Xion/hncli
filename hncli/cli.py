@@ -155,13 +155,16 @@ class HackerNews(cmd.Cmd):
         ''' Login to Hacker News as given user. '''
         user = user.strip()
         if not user:
-            print "*** No username provided"
+            print "su: no username provided"
+            return
+        if self.hn_client.authenticated and user == self.hn_client.user_name:
+            print "su: you are already logged in as " + user
             return
 
         password = getpass.getpass()
         success = self.hn_client.login(user, password)
         if not success:
-            print "Authentication failed."
+            print "su: authentication failed."
 
     def do_open(self, s):
         ''' Opens given story in a browser.
@@ -173,7 +176,7 @@ class HackerNews(cmd.Cmd):
         if story:
             webbrowser.open(story.url)
         else:
-            print "*** Unknown story: " + s
+            print "open: unknown story: " + s
 
     def do_post(self, s):
         ''' Posts a comment to given story. It opens up a console text editor
@@ -196,7 +199,7 @@ class HackerNews(cmd.Cmd):
 
         success = self.hn_client.post_comment(comment)
         if not success:
-            print "post: failed to post the co"
+            print "post: failed to post the comment"
 
     def do_help(self, command):
         ''' Display help for given command. '''
