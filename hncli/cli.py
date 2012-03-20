@@ -76,19 +76,20 @@ class HackerNews(cmd.Cmd):
         '''
         path = self._absolute_path(path)
         path = path.lstrip('/')
-        dir, s = path.split('/', 1)
+        directory, s = path.split('/', 1)
 
         # check whether it is a path with actual HN story ID
-        if dir is None or dir in self.ALL_STORIES_DIRS:
+        if directory is None or directory in self.ALL_STORIES_DIRS:
             story_id = cast(int, s, None)
             return self.stories.get(story_id)
 
         # here we assume we deal with index (position) within a directory
         idx = cast(lambda v: int(v, 16), s, None)
         if idx is not None:
-            stories = self.story_dirs.get(dir, [])
-            if 0 <= idx < len(stories):
-                return stories[idx]
+            story_dir = self.story_dirs.get(directory, [])
+            if 0 <= idx < len(story_dir):
+                s = story_dir[idx]
+                return self.stories.get(s)
 
     def _retrieve_stories(self, page, count=None):
         if isinstance(count, basestring):
@@ -97,7 +98,13 @@ class HackerNews(cmd.Cmd):
             count = cast(int, count, default=10)
 
         stories = self.hn_client.get_stories(page, count)
-        return list(stories)
+        stories = list(stories)
+
+        # remember Story objects cache based on their IDs
+        for story in stories:
+            self.stories[story.id] = story
+
+        return stories
 
 
     def do_cd(self, path):
@@ -126,9 +133,7 @@ class HackerNews(cmd.Cmd):
             }
             if pwd in story_pages:
                 stories = self._retrieve_stories(story_pages[pwd])
-                for story in stories:
-                    self.stories[story.id] = story
-                self.stories[pwd] = [s.id for s in stories]
+                self.story_dirs[pwd] = [s.id for s in stories]
                 return format_stories(stories)
 
             # handle stories, displaying their comments
@@ -145,7 +150,6 @@ class HackerNews(cmd.Cmd):
         pwd = self._absolute_path(args)
         res = ls(pwd)
         if res: print res
-
 
     def do_su(self, user):
         ''' Login to Hacker News as given user. '''
@@ -173,11 +177,13 @@ class HackerNews(cmd.Cmd):
 
     def do_post(self, s):
         ''' Posts a comment to given story. It opens up a console text editor
-        where user can enter their comment and then posts it.
+        where user can enter their comment. Adding can be canceled if empty
+        comment text has been given.
         '''
         story = self._get_story(s)
         if not story:
             print "post: could not find story " + s
+            return
 
         if not self.hn_client.authenticated:
             print "post: you cannot add comments as guest"

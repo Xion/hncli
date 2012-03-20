@@ -62,15 +62,15 @@ def long_input(prompt):
         prompt = os.linesep.join(prompt)
 
     fd, filename = tempfile.mkstemp(text=True)
+    os.close(fd)
     
     # set the file contents to given prompt and instructions
-    f = os.fdopen(fd)
-    f.write(os.linesep * 2)
-    for line in prompt.splitlines():
-        print "# " + line
-    print "# Lines starting with hash (#) are ignored"
-    print "# and empty input will abort the operation."
-    os.close(fd)
+    with open(filename, 'w') as f:
+        f.write(os.linesep * 2)
+        for line in prompt.splitlines():
+            print >>f, "# " + line
+        print >>f, "# Lines starting with hash (#) are ignored"
+        print >>f, "# and empty input will abort the operation."
 
     # let user edit the file
     edit_cmd = '%s "%s"' % (editor, filename)
@@ -101,16 +101,19 @@ def get_console_editor():
 
     editors = ['vim', 'emacs', 'nano', 'vi']
     for ed in editors:
-        exit_code = shell('which ' + ed)
+        exit_code = shell('which ' + ed, echo_stdout=False)
         if exit_code == 0:
             return ed 
 
-def shell(cmd):
+def shell(cmd, echo_stdout=True):
     ''' Executes given shell command. It uses the subprocess module
     rather than typical os.system().
     '''
+    kwargs = {}
+    if not echo_stdout:
+        kwargs['stdout'] = subprocess.PIPE
     try:
-        return subprocess.call(cmd, shell=True)
+        return subprocess.call(cmd, shell=True, **kwargs)
     except OSError, e:
         return -127
 
