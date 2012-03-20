@@ -197,7 +197,7 @@ class HackerNews(cmd.Cmd):
             print "post: adding comment canceled"
             return
 
-        success = self.hn_client.post_comment(comment)
+        success = self.hn_client.post_comment(story.id, comment)
         if not success:
             print "post: failed to post the comment"
 

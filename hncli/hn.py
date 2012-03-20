@@ -33,14 +33,29 @@ class Client(object):
             url = '/' + url
         return self.BASE_URL + url
 
+    def _request(self, method, page, **kwargs):
+        ''' Performs a HTTP request to Hacker News.
+        If the user is logged in, the authentication cookie
+        is attached automatically.
+        Returns the python-requests Response object.
+        '''
+        method = method.lower()
+        if not method in ['get', 'post']:
+            return None
+
+        request_args = {'url': self._hn_url(page)}
+        if self.authenticated:
+            request_args['cookies'] = {'user': self.auth_token}
+        request_args.update(kwargs)
+
+        func = getattr(requests, method)
+        return func(**request_args)
+
     def _fetch_page(self, page='/'):
         ''' Retrieves given Hacker News page.
         Returns the BeautifulSoup object with parsed HTML.
         '''
-        request_args = {'url': self._hn_url(page)}
-        if self.authenticated:
-            request_args['cookies'] = {'user': self.auth_token}
-        html = requests.get(**request_args).text
+        html = self._request('get', page).text
         soup = BeautifulSoup(html)
 
         if self.authenticated:
@@ -193,6 +208,5 @@ class Client(object):
             return False
 
         data = {'fnid': fnid, 'text': text}
-        resp = requests.post(self._hn_url('r'), data=data)
+        resp = self._request('post', '/r', data=data)
         return True
-
